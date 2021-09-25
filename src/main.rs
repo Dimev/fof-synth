@@ -1,12 +1,12 @@
 use rodio::{buffer::SamplesBuffer, OutputStream};
-use hound::{WavSpec, WavWriter};
+use hound::{WavSpec, WavWriter, SampleFormat};
 
 fn main() {
     
 	let sample_rate = 44100;
 
 	// base frequency, which effectively is the increment for the phase
-	let base_freq = 100.0 / sample_rate as f32;
+	let base_freq = 120.0 / sample_rate as f32;
 
 	// fof frequency, for the symplectic integrator
 	let fof_freq = 500.0 * std::f32::consts::TAU  / sample_rate as f32;
@@ -37,7 +37,7 @@ fn main() {
 		let pulse = if phase >= 1.0 {
 
 			// wrap around
-			phase -= 1.0;
+			phase = 0.0;
 
 			// and an impulse
 			1.0
@@ -68,8 +68,16 @@ fn main() {
 
 	}
 
+	// get the max amplitude
+	let max_amplitude = audio_output.iter().fold(0.0 as f32, |acc, x| acc.max(x.abs()));
+
 	// some info
-	println!("Max amplitude: {}", audio_output.iter().fold(0.0 as f32, |acc, x| acc.max(x.abs())));
+	println!("Max amplitude: {}", max_amplitude);
+
+	// normalize it to avoid playback issues
+	for s in &mut audio_output {
+		*s /= max_amplitude;
+	}
 
 	// playback
 	// Get a output stream handle to the default physical sound device
@@ -79,11 +87,11 @@ fn main() {
 	stream_handle.play_raw(SamplesBuffer::new(1, sample_rate as u32, audio_output.clone())).expect("Failed to play");
 
 	// get hound to get the spec so we can save the file
-    let spec = hound::WavSpec {
+    let spec = WavSpec {
         channels: 1,
         sample_rate: sample_rate as u32,
         bits_per_sample: 16,
-        sample_format: hound::SampleFormat::Int,
+        sample_format: SampleFormat::Int,
     };
 
 	// save it
