@@ -1,4 +1,5 @@
 use rodio::{buffer::SamplesBuffer, OutputStream};
+use hound::{WavSpec, WavWriter};
 
 fn main() {
     
@@ -77,7 +78,28 @@ fn main() {
 	// actually play it
 	stream_handle.play_raw(SamplesBuffer::new(1, sample_rate as u32, audio_output.clone())).expect("Failed to play");
 
+	// get hound to get the spec so we can save the file
+    let spec = hound::WavSpec {
+        channels: 1,
+        sample_rate: sample_rate as u32,
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int,
+    };
+
 	// save it
+	// and where to write the file to
+    let mut writer =
+        WavWriter::create("fof_sound.wav", spec).expect("failed to make writer");
+
+    // write all samples to the file
+    for sample in &audio_output {
+        writer
+            .write_sample((*sample * std::i16::MAX as f32) as i16)
+            .expect("failed to write");
+    }
+
+    // and save it
+    writer.finalize().expect("failed to save");
 
 	// wait for it to finish
 	std::thread::sleep(std::time::Duration::from_secs_f32(1.2));
