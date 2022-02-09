@@ -9,20 +9,31 @@ fn main() {
 	let base_freq = 120.0 / sample_rate as f32;
 
 	// fof frequency, for the symplectic integrator
-	let fof_freq = 500.0 * std::f32::consts::TAU  / sample_rate as f32;
+	let fof_freq = 400.0 * std::f32::consts::TAU  / sample_rate as f32;
 
-	// fof rise
-	// TODO
+	// decay bandwidth
+	let fof_decay_bw = 200.0 / sample_rate as f32;
 
 	// fof decay, or peak bandwidth
-	let fof_decay = (50.0 * -std::f32::consts::PI / sample_rate as f32).exp();
+	let fof_decay = (-fof_decay_bw * std::f32::consts::PI).exp();
+
+	// softness
+	let softness_bw = 100.0 / sample_rate as f32;
 
 	// phase of the pulse
 	let mut phase = 0.0;
 
+	// blend phase
+	let mut blend_phase = 0.0;
+
+	// which side to reset
+	let mut side = false;
+
 	// symplectic integrator states
-	let mut sine = 0.0;
-	let mut cosine = 0.0;
+	let mut sine_left = 0.0;
+	let mut cosine_left = 0.0;
+	let mut sine_right = 0.0;
+	let mut cosine_right = 0.0;
 
 	// array to put sound into
 	let mut audio_output = Vec::with_capacity(sample_rate);
@@ -32,36 +43,44 @@ fn main() {
 
 		// increment the phase
 		phase += base_freq;
+		blend_phase += softness_bw;
 
 		// if it hits 1, wrap it around and generate an impulse
-		let pulse = if phase >= 1.0 {
+		if phase >= 1.0 {
+
+			// change the side
+			side = !side;
 
 			// wrap around
 			phase = 0.0;
+			blend_phase = 0.0;
 
-			// and an impulse
-			1.0
-
-		} else {
-
-			// no impulse
-			0.0
-
-		};
-
-		// add it to the integrator
-		cosine += pulse;
+			if side {
+				sine_left = 0.0;
+				cosine_left = 1.0;
+			} else {
+				sine_right = 0.0;
+				cosine_right = 1.0;
+			}
+		}
 
 		// integrate the sine
-		cosine -= sine * fof_freq;
-		sine += cosine * fof_freq;
+		cosine_left -= sine_left * fof_freq;
+		sine_left += cosine_left * fof_freq;
+		cosine_right -= sine_right * fof_freq;
+		sine_right += cosine_right * fof_freq;
 
 		// decay
-		sine *= fof_decay;
-		cosine *= fof_decay;
+		sine_left *= fof_decay;
+		cosine_left *= fof_decay;
+		sine_right *= fof_decay;
+		cosine_right *= fof_decay;
+
+		// blend amount
+		let alpha = if side { blend_phase.min(1.0) } else { 1.0 - blend_phase.min(1.0) };
 
 		// resulting sound
-		let sample = sine;
+		let sample = sine_left * alpha + sine_right * (1.0 - alpha);
 
 		// add it to the output
 		audio_output.push(sample);
