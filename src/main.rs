@@ -9,7 +9,7 @@ fn main() {
 	let base_freq = 120.0 / sample_rate as f32;
 
 	// fof frequency, for the symplectic integrator
-	let fof_freq = 400.0 * std::f32::consts::TAU  / sample_rate as f32;
+	let fof_freq = 800.0 * std::f32::consts::TAU  / sample_rate as f32;
 
 	// decay bandwidth
 	let fof_decay_bw = 200.0 / sample_rate as f32;
