@@ -6,34 +6,21 @@ fn main() {
 	let sample_rate = 44100;
 
 	// base frequency, which effectively is the increment for the phase
-	let base_freq = 120.0 / sample_rate as f32;
+	let carrier_freq = 120.0 / sample_rate as f32;
 
 	// fof frequency, for the symplectic integrator
-	let fof_freq = 800.0 * std::f32::consts::TAU  / sample_rate as f32;
+	let modulator_freq = 480.0  / sample_rate as f32;
 
 	// decay bandwidth
-	let fof_decay_bw = 200.0 / sample_rate as f32;
-
-	// fof decay, or peak bandwidth
-	let fof_decay = (-fof_decay_bw * std::f32::consts::PI).exp();
-
-	// softness
-	let softness_bw = 100.0 / sample_rate as f32;
-
+	let bandwidth = 2.2;
 	// phase of the pulse
 	let mut phase = 0.0;
 
-	// blend phase
-	let mut blend_phase = 0.0;
-
-	// which side to reset
-	let mut side = false;
-
 	// symplectic integrator states
-	let mut sine_left = 0.0;
-	let mut cosine_left = 0.0;
-	let mut sine_right = 0.0;
-	let mut cosine_right = 0.0;
+	let mut sine_carrier = 0.0;
+	let mut cosine_carrier = 1.0;
+	let mut sine_modulator = 0.0;
+	let mut cosine_modulator = 1.0;
 
 	// array to put sound into
 	let mut audio_output = Vec::with_capacity(sample_rate);
@@ -42,45 +29,27 @@ fn main() {
 	for _ in 0..sample_rate {
 
 		// increment the phase
-		phase += base_freq;
-		blend_phase += softness_bw;
+		phase += carrier_freq;
 
 		// if it hits 1, wrap it around and generate an impulse
 		if phase >= 1.0 {
 
-			// change the side
-			side = !side;
+			sine_carrier = 0.0;
+			cosine_carrier = 1.0;
+			sine_modulator = 0.0;
+			cosine_modulator = 1.0;
 
-			// wrap around
 			phase = 0.0;
-			blend_phase = 0.0;
-
-			if side {
-				sine_left = 0.0;
-				cosine_left = 1.0;
-			} else {
-				sine_right = 0.0;
-				cosine_right = 1.0;
-			}
 		}
 
-		// integrate the sine
-		cosine_left -= sine_left * fof_freq;
-		sine_left += cosine_left * fof_freq;
-		cosine_right -= sine_right * fof_freq;
-		sine_right += cosine_right * fof_freq;
-
-		// decay
-		sine_left *= fof_decay;
-		cosine_left *= fof_decay;
-		sine_right *= fof_decay;
-		cosine_right *= fof_decay;
-
-		// blend amount
-		let alpha = if side { blend_phase.min(1.0) } else { 1.0 - blend_phase.min(1.0) };
+		// integrate the sines
+		cosine_carrier -= sine_carrier * carrier_freq * std::f32::consts::TAU;
+		sine_carrier += cosine_carrier * carrier_freq * std::f32::consts::TAU;
+		cosine_modulator -= sine_modulator * modulator_freq * std::f32::consts::TAU;
+		sine_modulator += cosine_modulator * modulator_freq * std::f32::consts::TAU;
 
 		// resulting sound
-		let sample = sine_left * alpha + sine_right * (1.0 - alpha);
+		let sample = (bandwidth * (cosine_carrier - 1.0)).exp() * cosine_modulator;
 
 		// add it to the output
 		audio_output.push(sample);
